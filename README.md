@@ -1,53 +1,51 @@
 # Surebet Arbitrage Aggregator
 
-This Apify actor aggregates unique bookmaker combinations (pairs, triples, etc.) from surebet opportunities and stores them in a persistent dataset on a daily schedule.
+This Apify actor aggregates unique bookmaker combinations (pairs, triples, etc.) from surebet opportunities, tracks their occurrence frequency, and stores them in a persistent dataset on a daily schedule.
 
 ---
 
 ## Table of Contents
 
-* [Features](#features)
-* [Prerequisites](#prerequisites)
-* [Installation](#installation)
-* [Configuration](#configuration)
-* [Local Testing](#local-testing)
-* [Deployment](#deployment)
-* [Usage](#usage)
-* [Data Model](#data-model)
-* [Logging](#logging)
-* [License](#license)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Local Testing](#local-testing)
+- [Deployment](#deployment)
+- [Usage](#usage)
+- [Data Model](#data-model)
+- [Logging](#logging)
+- [License](#license)
 
 ---
 
 ## Features
 
-* Executes on a daily cron schedule (Europe/Prague timezone).
-* Calls a preconfigured surebet-scraper task to fetch raw opportunities.
-* Generates all unique combinations of bookmakers (size ≥ 2).
-* Deduplicates entries across runs using a SHA‑256 hash store.
-* Captures event timestamps to distinguish same-day occurrences.
-* Persists results in a long‑term Apify dataset.
+- **Scheduled Execution**: Runs daily at midnight in the Europe/Prague timezone.
+- **Task-Based Input**: Calls a preconfigured scraper **Task** (`oddspedia-scan-surebets`)—no runtime input needed.
+- **Combination Extraction**: Generates all unique, order‑insensitive bookmaker combinations (size ≥ 2) per event.
+- **Deduplication**: Uses a SHA‑256 hash store (`STATE` key‑value store) to avoid reprocessing the same event-timestamp combination.
+- **Frequency Tracking**: Maintains occurrence counts for each bookmaker combination in a separate `COUNTS` key‑value store.
+- **Persistent Storage**: Appends new combinations with timestamps into the default dataset for long‑term analysis.
 
 ---
 
 ## Prerequisites
 
-* [Node.js](https://nodejs.org/) v16+ (tested with v24.4.0)
-* [Apify CLI](https://sdk.apify.com/cli) v2+ for local development
-* An existing Apify **Task** that runs the surebet-scraper (e.g., `oddspedia-scan-surebets`)
+- **Node.js** v16+ (tested with v24.4.0)
+- **Apify CLI** for local development and testing
+- An existing Apify **Task** called `oddspedia-scan-surebets` (or similar) that scrapes surebet data and writes to its default dataset
 
 ---
 
 ## Installation
 
-1. Clone the repo:
-
+1. **Clone the repository**:
    ```bash
    git clone <your-repo-url>
    cd surebet-arbitrage-aggregator
    ```
-2. Install dependencies:
-
+2. **Install dependencies**:
    ```bash
    npm install
    ```
@@ -56,29 +54,31 @@ This Apify actor aggregates unique bookmaker combinations (pairs, triples, etc.)
 
 ## Configuration
 
-1. Rename `.env.example` to `.env` and edit:
-
+1. **Set environment variables** in a `.env` file at project root:
    ```ini
-   SCRAPER_TASK_ID=your-scraper-task-id
+   SCRAPER_TASK_ID=straightforward_understanding/oddspedia-scan-surebets
    ```
-2. Adjust schedule or other settings in [`actor.json`](./actor.json) if needed.
+   - `SCRAPER_TASK_ID`: Apify Task identifier for the scraper.
+
+2. **Review schedule** (in `actor.json`) to adjust cron or timezone if desired.
 
 ---
 
 ## Local Testing
 
-Run the actor locally against your task:
+Build and run locally using the Apify CLI:
 
 ```bash
 # Build TypeScript
 npm run build
 
-# Provide an .env file or pass env directly
+# Run locally with verbose logs
 SCRAPER_TASK_ID=oddspedia-scan-surebets apify run --local --verbose
 ```
 
-* Output dataset: `./apify_storage/datasets/default/items.json`
-* State KVS: `./apify_storage/key_value_stores/STATE.json`
+- **Dataset**: `./apify_storage/datasets/default/items.json`
+- **STATE store**: `./apify_storage/key_value_stores/STATE.json`
+- **COUNTS store**: `./apify_storage/key_value_stores/COUNTS.json`
 
 ---
 
@@ -90,29 +90,45 @@ Push to Apify platform:
 apify push
 ```
 
-The actor will run daily at midnight Europe/Prague by default.
+The actor will then run automatically on the defined schedule.
 
 ---
 
 ## Usage
 
-Monitor runs and view aggregated data in the Apify console under **Actors → surebet-arbitrage-aggregator → Datasets**.
+1. In the Apify Console, navigate to **Actors → surebet-arbitrage-aggregator**.
+2. Monitor runs and logs to ensure successful execution.
+3. View the aggregated combinations in the **Default Dataset**.
+4. Inspect frequency counts in the **COUNTS** key‑value store for aggregated occurrence statistics.
 
 ---
 
 ## Data Model
 
-Each record in the dataset has:
+### Default Dataset
+Each record represents a newly discovered bookmaker combination for an event:
 
-* `brokers` — Array of bookmaker names (sorted lexicographically).
-* `timestamp` — ISO‑8601 string of the event date/time.
+| Field      | Type         | Description                                  |
+|------------|--------------|----------------------------------------------|
+| `brokers`  | `string[]`   | Sorted array of bookmaker names              |
+| `timestamp`| `string`      | ISO 8601 event timestamp or scrape time      |
 
-Example:
+**Example**:
+```json
+{
+  "brokers": ["Bet365", "William Hill", "Pinnacle"],
+  "timestamp": "2025-07-14T06:30:00Z"
+}
+```
+
+### COUNTS Store
+A key‑value map of combination keys (``brokerA|brokerB|...``) to integer counts:
 
 ```json
 {
-  "brokers": ["Bet365", "William Hill"],
-  "timestamp": "2025-07-12T18:30:00Z"
+  "Bet365|William Hill": 42,
+  "Bet365|Pinnacle": 17,
+  "Bet365|Pinnacle|William Hill": 5
 }
 ```
 
@@ -120,12 +136,11 @@ Example:
 
 ## Logging
 
-* **INFO**: High‑level progress (startup, counts, shutdown).
-* **WARNING**: Unusual conditions (zero items, count mismatches).
-* **DEBUG**: Detailed internal state (sample items, combination counts).
+- **INFO**: High‑level progress (startup, counts loaded, run IDs, summary).
+- **WARNING**: Missing data or unexpected zero‑item conditions.
+- **DEBUG**: Detailed per‑item combination counts and samples.
 
-Configure log level via environment variable:
-
+Control verbosity via:
 ```bash
 LOG_LEVEL=debug
 ```
@@ -133,4 +148,6 @@ LOG_LEVEL=debug
 ---
 
 ## License
-GNU General Public License v3.0
+
+This project is licensed under the **GNU General Public License v3.0** (GPL‑3.0). See the [LICENSE](LICENSE) file for details.
+
