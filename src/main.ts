@@ -1,20 +1,9 @@
-import crypto from 'node:crypto';
+import { Actor, KeyValueStore, Dataset, log } from 'apify';
+import crypto from 'crypto';
 
-import type { Dataset, KeyValueStore } from 'apify';
-import { Actor, log } from 'apify';
-
-interface Outcome {
-    broker: string;
-}
-interface Item {
-    allocation?: { isSurebet: boolean };
-    outcomes: Outcome[];
-    date?: string;
-}
-interface StoredRecord {
-    brokers: string[];
-    timestamp: string;
-}
+interface Outcome { broker: string; }
+interface Item { allocation?: { isSurebet: boolean }; outcomes: Outcome[]; date?: string; }
+interface StoredRecord { brokers: string[]; timestamp: string; }
 
 /**
  * Generate all unique combinations of array elements of length >= 2 without bitwise operations.
@@ -22,7 +11,6 @@ interface StoredRecord {
 function getCombinations<T>(arr: T[]): T[][] {
     const results: T[][] = [];
     const combo: T[] = [];
-
     function backtrack(start: number) {
         if (combo.length >= 2) {
             results.push([...combo].sort());
@@ -33,7 +21,6 @@ function getCombinations<T>(arr: T[]): T[][] {
             combo.pop();
         }
     }
-
     backtrack(0);
     return results;
 }
@@ -43,7 +30,10 @@ await Actor.main(async () => {
 
     // Initialize counts store for frequency tracking
     const countsStore: KeyValueStore = await Actor.openKeyValueStore('COUNTS');
-    const counts: Record<string, number> = (await countsStore.getValue('comboCounts')) || {};
+    const countsRaw = await countsStore.getValue('comboCounts');
+    const counts: Record<string, number> = countsRaw && typeof countsRaw === 'object'
+        ? (countsRaw as Record<string, number>)
+        : {};
     log.info(`Loaded frequency counts for ${Object.keys(counts).length} combos`);
 
     log.info('Surebet Arbitrage Aggregator started');
@@ -54,10 +44,23 @@ await Actor.main(async () => {
     const run = await Actor.callTask(subTaskId);
     log.info(`Sub-task run ID: ${run.id}, status: ${run.status}`);
 
-    // Fetch items directly from the task's default dataset
+    // Fetch raw items from the task's default dataset
     const client = Actor.newClient();
     const datasetClient = client.dataset(run.defaultDatasetId!);
-    const { items } = await datasetClient.listItems<Item>();
+    const listResponse = await datasetClient.listItems();
+    const rawItems = Array.isArray(listResponse.items) ? listResponse.items : [];
+    // Convert and validate raw items into typed Item objects
+    const items: Item[] = rawItems
+        .filter(r => Array.isArray((r as any).outcomes))
+        .map(r => {
+            const rec = r as any;
+            return {
+                allocation: rec.allocation as { isSurebet: boolean } | undefined,
+                outcomes: (rec.outcomes as any[])
+                    .map(o => ({ broker: String(o.broker) })),
+                date: typeof rec.date === 'string' ? rec.date : undefined,
+            };
+        });
     log.info(`Retrieved ${items.length} items from scraper dataset (ID: ${run.defaultDatasetId})`);
     if (items.length === 0) {
         log.warning('No items found in the scraper dataset; check task health and parameters.');
@@ -65,19 +68,20 @@ await Actor.main(async () => {
 
     // Load dedupe state
     const stateStore: KeyValueStore = await Actor.openKeyValueStore('STATE');
-    const seen: string[] = (await stateStore.getValue('seenHashes')) || [];
-    const seenSet = new Set<string>(seen);
+    const seenRaw = await stateStore.getValue('seenHashes');
+    const seen: string[] = Array.isArray(seenRaw) ? (seenRaw as string[]) : [];
+    const seenSet: Set<string> = new Set(seen);
     log.info(`Loaded ${seenSet.size} previously seen hashes`);
 
     // Prepare aggregated dataset
-    const aggregatedDataset: Dataset<StoredRecord> = await Actor.openDataset();
+    const aggregatedDataset: Dataset<StoredRecord> = await Actor.openDataset<StoredRecord>();
     const newRecords: StoredRecord[] = [];
 
     // Process items
     for (const item of items) {
-        const brokers = item.outcomes.map((o) => o.broker);
+        const brokers = item.outcomes.map((o: Outcome) => o.broker);
         if (brokers.length < 2) continue;
-        const timestamp = item.date ?? new Date().toISOString();
+        const timestamp = typeof item.date === 'string' ? item.date : new Date().toISOString();
         const combos = getCombinations(brokers);
         log.debug(`Item at ${timestamp} has ${combos.length} broker combinations`);
         for (const combo of combos) {
@@ -107,3 +111,4 @@ await Actor.main(async () => {
     log.info('Surebet Arbitrage Aggregator finished');
     await Actor.exit();
 });
+
