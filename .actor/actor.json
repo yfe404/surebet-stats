@@ -1,0 +1,19 @@
+{
+    "actorSpecification": 1,
+    "name": "surebet-arbitrage-aggregator",
+    "title": "Surebet Arbitrage Aggregator",
+    "description": "Aggregates unique bookmaker combinations of any size with timestamps from surebet opportunities, updating daily via a scheduled task call.",
+    "version": "0.8",
+    "meta": {
+        "templateId": "node-js-typescript"
+    },
+    "storages": {
+        "dataset": "./output_schema.json",
+        "keyValueStores": { "STATE": "STATE" }
+    },
+    "schedule": {
+        "cronExpression": "0 0 * * *",
+        "tz": "Europe/Prague"
+    },
+    "dockerfile": "../Dockerfile"
+}

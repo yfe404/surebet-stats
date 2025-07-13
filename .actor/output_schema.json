@@ -1,0 +1,16 @@
+{
+    "actorSpecification": 1,
+    "title": "Surebet Bookmaker Combinations – Output",
+    "fields": {
+        "brokers": {
+            "title": "Bookmakers",
+            "type": "array",
+            "items": { "type": "string" }
+        },
+        "timestamp": {
+            "title": "Event Timestamp",
+            "type": "string",
+            "format": "date-time"
+        }
+    }
+}
