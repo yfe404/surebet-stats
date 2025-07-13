@@ -41,24 +41,26 @@ This Apify actor aggregates unique bookmaker combinations (pairs, triples, etc.)
 ## Installation
 
 1. **Clone the repository**:
-   ```bash
-   git clone <your-repo-url>
-   cd surebet-arbitrage-aggregator
-   ```
+    ```bash
+    git clone <your-repo-url>
+    cd surebet-arbitrage-aggregator
+    ```
 2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+    ```bash
+    npm install
+    ```
 
 ---
 
 ## Configuration
 
 1. **Set environment variables** in a `.env` file at project root:
-   ```ini
-   SCRAPER_TASK_ID=straightforward_understanding/oddspedia-scan-surebets
-   ```
-   - `SCRAPER_TASK_ID`: Apify Task identifier for the scraper.
+
+    ```ini
+    SCRAPER_TASK_ID=straightforward_understanding/oddspedia-scan-surebets
+    ```
+
+    - `SCRAPER_TASK_ID`: Apify Task identifier for the scraper.
 
 2. **Review schedule** (in `actor.json`) to adjust cron or timezone if desired.
 
@@ -106,29 +108,32 @@ The actor will then run automatically on the defined schedule.
 ## Data Model
 
 ### Default Dataset
+
 Each record represents a newly discovered bookmaker combination for an event:
 
-| Field      | Type         | Description                                  |
-|------------|--------------|----------------------------------------------|
-| `brokers`  | `string[]`   | Sorted array of bookmaker names              |
-| `timestamp`| `string`      | ISO 8601 event timestamp or scrape time      |
+| Field       | Type       | Description                             |
+| ----------- | ---------- | --------------------------------------- |
+| `brokers`   | `string[]` | Sorted array of bookmaker names         |
+| `timestamp` | `string`   | ISO 8601 event timestamp or scrape time |
 
 **Example**:
+
 ```json
 {
-  "brokers": ["Bet365", "William Hill", "Pinnacle"],
-  "timestamp": "2025-07-14T06:30:00Z"
+    "brokers": ["Bet365", "William Hill", "Pinnacle"],
+    "timestamp": "2025-07-14T06:30:00Z"
 }
 ```
 
 ### COUNTS Store
-A key‑value map of combination keys (``brokerA|brokerB|...``) to integer counts:
+
+A key‑value map of combination keys (`brokerA|brokerB|...`) to integer counts:
 
 ```json
 {
-  "Bet365|William Hill": 42,
-  "Bet365|Pinnacle": 17,
-  "Bet365|Pinnacle|William Hill": 5
+    "Bet365|William Hill": 42,
+    "Bet365|Pinnacle": 17,
+    "Bet365|Pinnacle|William Hill": 5
 }
 ```
 
@@ -141,6 +146,7 @@ A key‑value map of combination keys (``brokerA|brokerB|...``) to integer count
 - **DEBUG**: Detailed per‑item combination counts and samples.
 
 Control verbosity via:
+
 ```bash
 LOG_LEVEL=debug
 ```
@@ -150,4 +156,3 @@ LOG_LEVEL=debug
 ## License
 
 This project is licensed under the **GNU General Public License v3.0** (GPL‑3.0). See the [LICENSE](LICENSE) file for details.
-
