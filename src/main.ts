@@ -1,20 +1,40 @@
-import { Actor, KeyValueStore, Dataset, log } from 'apify';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
-interface Outcome { broker: string; }
-interface Item { allocation?: { isSurebet: boolean }; outcomes: Outcome[]; date?: string; }
-interface StoredRecord { brokers: string[]; timestamp: string; }
+import type { Dataset, KeyValueStore } from 'apify';
+import { Actor, log } from 'apify';
 
-function getCombinations(arr: string[]): string[][] {
-    const results: string[][] = [];
-    const n = arr.length;
-    for (let mask = 0; mask < (1 << n); mask++) {
-        const combo: string[] = [];
-        for (let i = 0; i < n; i++) {
-            if (mask & (1 << i)) combo.push(arr[i]);
+interface Outcome {
+    broker: string;
+}
+interface Item {
+    allocation?: { isSurebet: boolean };
+    outcomes: Outcome[];
+    date?: string;
+}
+interface StoredRecord {
+    brokers: string[];
+    timestamp: string;
+}
+
+/**
+ * Generate all unique combinations of array elements of length >= 2 without bitwise operations.
+ */
+function getCombinations<T>(arr: T[]): T[][] {
+    const results: T[][] = [];
+    const combo: T[] = [];
+
+    function backtrack(start: number) {
+        if (combo.length >= 2) {
+            results.push([...combo].sort());
         }
-        if (combo.length >= 2) results.push(combo.sort());
+        for (let i = start; i < arr.length; i++) {
+            combo.push(arr[i]);
+            backtrack(i + 1);
+            combo.pop();
+        }
     }
+
+    backtrack(0);
     return results;
 }
 
@@ -55,7 +75,7 @@ await Actor.main(async () => {
 
     // Process items
     for (const item of items) {
-        const brokers = item.outcomes.map(o => o.broker);
+        const brokers = item.outcomes.map((o) => o.broker);
         if (brokers.length < 2) continue;
         const timestamp = item.date ?? new Date().toISOString();
         const combos = getCombinations(brokers);
@@ -87,4 +107,3 @@ await Actor.main(async () => {
     log.info('Surebet Arbitrage Aggregator finished');
     await Actor.exit();
 });
-
